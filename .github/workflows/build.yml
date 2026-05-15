@@ -29,23 +29,73 @@ jobs:
             --windowed \
             --onedir \
             --osx-bundle-identifier "com.ew010.pdf2markdown" \
-            --collect-all PyQt6 \
-            --collect-all rapidocr \
-            --collect-all onnxruntime \
+            --collect-submodules rapidocr \
+            --collect-submodules rapidocr.utils \
+            --collect-binaries onnxruntime \
+            --copy-metadata rapidocr \
+            --copy-metadata onnxruntime \
+            --exclude-module matplotlib \
+            --exclude-module numpy.random._examples \
+            --exclude-module scipy \
+            --exclude-module pandas \
+            --exclude-module sklearn \
+            --exclude-module PyQt6.Qt6.Qml \
+            --exclude-module PyQt6.Qt6.QmlModels \
+            --exclude-module PyQt6.Qt6.Quick \
+            --exclude-module PyQt6.Qt6.Quick3D \
+            --exclude-module PyQt6.Qt6.Quick3DAssetImport \
+            --exclude-module PyQt6.Qt6.Quick3DHelpers \
+            --exclude-module PyQt6.Qt6.Quick3DParticles \
+            --exclude-module PyQt6.Qt6.Quick3DRuntimeRender \
+            --exclude-module PyQt6.Qt6.Quick3DUtils \
+            --exclude-module PyQt6.Qt6.QuickControls2 \
+            --exclude-module PyQt6.Qt6.QuickDialogs2 \
+            --exclude-module PyQt6.Qt6.QuickDialogs2QuickImpl \
+            --exclude-module PyQt6.Qt6.QuickDialogs2Utils \
+            --exclude-module PyQt6.Qt6.QuickLayouts \
+            --exclude-module PyQt6.Qt6.QuickParticles \
+            --exclude-module PyQt6.Qt6.QuickShapes \
+            --exclude-module PyQt6.Qt6.QuickTemplates2 \
+            --exclude-module PyQt6.Qt6.QuickTest \
+            --exclude-module PyQt6.Qt6.QuickTimeline \
+            --exclude-module PyQt6.Qt6.QuickWidgets \
+            --exclude-module PyQt6.Qt6.3DAnimation \
+            --exclude-module PyQt6.Qt6.3DCore \
+            --exclude-module PyQt6.Qt6.3DExtras \
+            --exclude-module PyQt6.Qt6.3DInput \
+            --exclude-module PyQt6.Qt6.3DLogic \
+            --exclude-module PyQt6.Qt6.3DRender \
+            --exclude-module PyQt6.Qt6.Charts \
+            --exclude-module PyQt6.Qt6.DataVisualization \
+            --exclude-module PyQt6.Qt6.Graphs \
+            --exclude-module PyQt6.Qt6.Location \
+            --exclude-module PyQt6.Qt6.Multimedia \
+            --exclude-module PyQt6.Qt6.MultimediaWidgets \
+            --exclude-module PyQt6.Qt6.Network \
+            --exclude-module PyQt6.Qt6.Nfc \
+            --exclude-module PyQt6.Qt6.Positioning \
+            --exclude-module PyQt6.Qt6.PositioningQuick \
+            --exclude-module PyQt6.Qt6.RemoteObjects \
+            --exclude-module PyQt6.Qt6.Sensors \
+            --exclude-module PyQt6.Qt6.SerialPort \
+            --exclude-module PyQt6.Qt6.Speech \
+            --exclude-module PyQt6.Qt6.Sql \
+            --exclude-module PyQt6.Qt6.StateMachine \
+            --exclude-module PyQt6.Qt6.Svg \
+            --exclude-module PyQt6.Qt6.SvgWidgets \
+            --exclude-module PyQt6.Qt6.Test \
+            --exclude-module PyQt6.Qt6.TextToSpeech \
+            --exclude-module PyQt6.Qt6.WebChannel \
+            --exclude-module PyQt6.Qt6.WebEngineCore \
+            --exclude-module PyQt6.Qt6.WebEngineQuick \
+            --exclude-module PyQt6.Qt6.WebEngineWidgets \
+            --exclude-module PyQt6.Qt6.WebSockets \
+            --exclude-module PyQt6.Qt6.WebView \
             --hidden-import=rapidocr \
             --hidden-import=onnxruntime \
             --hidden-import=fitz \
             --hidden-import=PIL \
             main_gui.py
-
-      - name: Fix Qt Framework Paths (macOS)
-        run: |
-          APP_PATH="dist/PDF2Markdown.app"
-          # Ensure Qt plugins are properly signed and located
-          if [ -d "$APP_PATH/Contents/MacOS/PyQt6/Qt6/plugins" ]; then
-            mkdir -p "$APP_PATH/Contents/PlugIns"
-            cp -R "$APP_PATH/Contents/MacOS/PyQt6/Qt6/plugins/"* "$APP_PATH/Contents/PlugIns/" || true
-          fi
 
       - name: Package macOS
         run: |
@@ -79,8 +129,15 @@ jobs:
             --name "PDF2Markdown" `
             --windowed `
             --onefile `
-            --collect-all rapidocr `
-            --collect-all onnxruntime `
+            --collect-submodules rapidocr `
+            --collect-submodules rapidocr.utils `
+            --collect-binaries onnxruntime `
+            --copy-metadata rapidocr `
+            --copy-metadata onnxruntime `
+            --exclude-module matplotlib `
+            --exclude-module scipy `
+            --exclude-module pandas `
+            --exclude-module sklearn `
             --hidden-import=rapidocr `
             --hidden-import=onnxruntime `
             --hidden-import=fitz `

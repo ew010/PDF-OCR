@@ -37,6 +37,15 @@ def build():
         '--hidden-import=onnxruntime',
         '--hidden-import=fitz',
         '--hidden-import=PIL',
+        '--collect-submodules', 'rapidocr',
+        '--collect-submodules', 'rapidocr.utils',
+        '--collect-binaries', 'onnxruntime',
+        '--copy-metadata', 'rapidocr',
+        '--copy-metadata', 'onnxruntime',
+        '--exclude-module', 'matplotlib',
+        '--exclude-module', 'scipy',
+        '--exclude-module', 'pandas',
+        '--exclude-module', 'sklearn',
     ]
 
     # 平台特定配置
@@ -44,19 +53,42 @@ def build():
         cmd.extend([
             '--onedir',
             '--osx-bundle-identifier', 'com.ew010.pdf2markdown',
-            '--collect-all', 'PyQt6',
-            '--collect-all', 'rapidocr',
-            '--collect-all', 'onnxruntime',
         ])
+        # 排除大量不需要的 Qt 模块
+        qt_excludes = [
+            'PyQt6.Qt6.Qml', 'PyQt6.Qt6.QmlModels', 'PyQt6.Qt6.Quick',
+            'PyQt6.Qt6.Quick3D', 'PyQt6.Qt6.Quick3DAssetImport',
+            'PyQt6.Qt6.Quick3DHelpers', 'PyQt6.Qt6.Quick3DParticles',
+            'PyQt6.Qt6.Quick3DRuntimeRender', 'PyQt6.Qt6.Quick3DUtils',
+            'PyQt6.Qt6.QuickControls2', 'PyQt6.Qt6.QuickDialogs2',
+            'PyQt6.Qt6.QuickDialogs2QuickImpl', 'PyQt6.Qt6.QuickDialogs2Utils',
+            'PyQt6.Qt6.QuickLayouts', 'PyQt6.Qt6.QuickParticles',
+            'PyQt6.Qt6.QuickShapes', 'PyQt6.Qt6.QuickTemplates2',
+            'PyQt6.Qt6.QuickTest', 'PyQt6.Qt6.QuickTimeline',
+            'PyQt6.Qt6.QuickWidgets', 'PyQt6.Qt6.3DAnimation',
+            'PyQt6.Qt6.3DCore', 'PyQt6.Qt6.3DExtras', 'PyQt6.Qt6.3DInput',
+            'PyQt6.Qt6.3DLogic', 'PyQt6.Qt6.3DRender', 'PyQt6.Qt6.Charts',
+            'PyQt6.Qt6.DataVisualization', 'PyQt6.Qt6.Graphs',
+            'PyQt6.Qt6.Location', 'PyQt6.Qt6.Multimedia',
+            'PyQt6.Qt6.MultimediaWidgets', 'PyQt6.Qt6.Network',
+            'PyQt6.Qt6.Nfc', 'PyQt6.Qt6.Positioning',
+            'PyQt6.Qt6.PositioningQuick', 'PyQt6.Qt6.RemoteObjects',
+            'PyQt6.Qt6.Sensors', 'PyQt6.Qt6.SerialPort', 'PyQt6.Qt6.Speech',
+            'PyQt6.Qt6.Sql', 'PyQt6.Qt6.StateMachine', 'PyQt6.Qt6.Svg',
+            'PyQt6.Qt6.SvgWidgets', 'PyQt6.Qt6.Test',
+            'PyQt6.Qt6.TextToSpeech', 'PyQt6.Qt6.WebChannel',
+            'PyQt6.Qt6.WebEngineCore', 'PyQt6.Qt6.WebEngineQuick',
+            'PyQt6.Qt6.WebEngineWidgets', 'PyQt6.Qt6.WebSockets',
+            'PyQt6.Qt6.WebView',
+        ]
+        for mod in qt_excludes:
+            cmd.extend(['--exclude-module', mod])
+
         icon_path = 'assets/icon.icns'
         if os.path.exists(icon_path):
             cmd.extend(['--icon', icon_path])
     elif platform == 'windows':
-        cmd.extend([
-            '--onefile',
-            '--collect-all', 'rapidocr',
-            '--collect-all', 'onnxruntime',
-        ])
+        cmd.append('--onefile')
         icon_path = 'assets/icon.ico'
         if os.path.exists(icon_path):
             cmd.extend(['--icon', icon_path])
@@ -70,27 +102,19 @@ def build():
         print("打包失败!")
         sys.exit(1)
 
-    # macOS: 修复 Qt 插件路径
-    if platform == 'macos':
-        app_path = Path('dist/PDF2Markdown.app')
-        plugins_src = app_path / 'Contents/MacOS/PyQt6/Qt6/plugins'
-        plugins_dst = app_path / 'Contents/PlugIns'
-        if plugins_src.exists():
-            plugins_dst.mkdir(parents=True, exist_ok=True)
-            for item in plugins_src.iterdir():
-                dst = plugins_dst / item.name
-                if dst.exists():
-                    shutil.rmtree(dst) if dst.is_dir() else dst.unlink()
-                if item.is_dir():
-                    shutil.copytree(item, dst)
-                else:
-                    shutil.copy2(item, dst)
-            print("已修复 Qt 插件路径")
-
     print("打包成功!")
     dist_path = Path('dist')
     for f in dist_path.iterdir():
         print(f"  生成文件: {f}")
+
+    # 显示体积
+    if platform == 'macos':
+        app_path = dist_path / 'PDF2Markdown.app'
+        if app_path.exists():
+            total_size = sum(
+                f.stat().st_size for f in app_path.rglob('*') if f.is_file()
+            )
+            print(f"  App 体积: {total_size / 1024 / 1024:.1f} MB")
 
 
 if __name__ == '__main__':

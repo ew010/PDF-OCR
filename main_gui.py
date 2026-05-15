@@ -2,28 +2,24 @@ import sys
 import os
 import threading
 from pathlib import Path
-
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QFileDialog, QTextEdit, QProgressBar,
-    QMessageBox, QLineEdit, QGroupBox, QSpinBox, QCheckBox
+from tkinter import (
+    Tk, Frame, Label, Button, Entry, Text, Scrollbar,
+    filedialog, messagebox, IntVar, Checkbutton, StringVar
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QFont
+from tkinter import ttk
 
 from pdf_to_md import PDFToMarkdownConverter
 
 
-class ConvertThread(QThread):
-    progress = pyqtSignal(int, int, str)
-    finished = pyqtSignal(str)
-    error = pyqtSignal(str)
-
-    def __init__(self, pdf_path, output_path, dpi=300):
-        super().__init__()
+class ConvertThread(threading.Thread):
+    def __init__(self, pdf_path, output_path, dpi=300, progress_cb=None, finished_cb=None, error_cb=None):
+        super().__init__(daemon=True)
         self.pdf_path = pdf_path
         self.output_path = output_path
         self.dpi = dpi
+        self.progress_cb = progress_cb
+        self.finished_cb = finished_cb
+        self.error_cb = error_cb
         self._is_running = True
 
     def run(self):
@@ -32,292 +28,208 @@ class ConvertThread(QThread):
             def progress_cb(page, total, msg):
                 if not self._is_running:
                     raise InterruptedError("用户取消")
-                self.progress.emit(page, total, msg)
+                if self.progress_cb:
+                    self.progress_cb(page, total, msg)
 
             result = converter.convert(self.pdf_path, self.output_path, progress_cb)
-            if self._is_running:
-                self.finished.emit(str(result))
+            if self._is_running and self.finished_cb:
+                self.finished_cb(str(result))
         except InterruptedError:
             pass
         except Exception as e:
-            if self._is_running:
-                self.error.emit(str(e))
+            if self._is_running and self.error_cb:
+                self.error_cb(str(e))
 
     def stop(self):
         self._is_running = False
-        self.wait(2000)
 
 
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("PDF 转 Markdown 工具")
-        self.setMinimumSize(700, 500)
+class MainWindow:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("PDF 转 Markdown 工具")
+        self.root.geometry("700x550")
+        self.root.minsize(600, 450)
         self.convert_thread = None
         self.setup_ui()
-        self.apply_styles()
 
     def setup_ui(self):
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        layout = QVBoxLayout(central_widget)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
+        # 主容器
+        main_frame = Frame(self.root, padx=20, pady=15)
+        main_frame.pack(fill="both", expand=True)
 
         # 标题
-        title = QLabel("PDF 转 Markdown (OCR)")
-        title_font = QFont()
-        title_font.setPointSize(18)
-        title_font.setBold(True)
-        title.setFont(title_font)
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        title = Label(main_frame, text="PDF 转 Markdown (OCR)", font=("Microsoft YaHei", 16, "bold"))
+        title.pack(pady=(0, 15))
 
         # 文件选择区域
-        file_group = QGroupBox("文件选择")
-        file_layout = QVBoxLayout(file_group)
+        file_frame = ttk.LabelFrame(main_frame, text="文件选择", padding=10)
+        file_frame.pack(fill="x", pady=5)
 
-        pdf_layout = QHBoxLayout()
-        self.pdf_path_edit = QLineEdit()
-        self.pdf_path_edit.setPlaceholderText("拖拽 PDF 文件到此处，或点击选择...")
-        self.pdf_path_edit.setReadOnly(True)
-        self.pdf_path_edit.setMinimumHeight(35)
-        pdf_btn = QPushButton("选择 PDF")
-        pdf_btn.setMinimumHeight(35)
-        pdf_btn.clicked.connect(self.select_pdf)
-        pdf_layout.addWidget(self.pdf_path_edit)
-        pdf_layout.addWidget(pdf_btn)
-        file_layout.addLayout(pdf_layout)
+        # PDF 路径
+        pdf_row = Frame(file_frame)
+        pdf_row.pack(fill="x", pady=3)
+        self.pdf_path_var = StringVar()
+        pdf_entry = Entry(pdf_row, textvariable=self.pdf_path_var, state="readonly", fg="gray")
+        pdf_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        pdf_entry.configure(readonlybackground="white")
+        pdf_btn = Button(pdf_row, text="选择 PDF", command=self.select_pdf, width=12)
+        pdf_btn.pack(side="right")
 
-        out_layout = QHBoxLayout()
-        self.output_path_edit = QLineEdit()
-        self.output_path_edit.setPlaceholderText("输出 Markdown 路径（可选，默认同名）")
-        self.output_path_edit.setMinimumHeight(35)
-        out_btn = QPushButton("选择输出路径")
-        out_btn.setMinimumHeight(35)
-        out_btn.clicked.connect(self.select_output)
-        out_layout.addWidget(self.output_path_edit)
-        out_layout.addWidget(out_btn)
-        file_layout.addLayout(out_layout)
-
-        layout.addWidget(file_group)
+        # 输出路径
+        out_row = Frame(file_frame)
+        out_row.pack(fill="x", pady=3)
+        self.output_path_var = StringVar()
+        out_entry = Entry(out_row, textvariable=self.output_path_var, state="readonly", fg="gray")
+        out_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
+        out_entry.configure(readonlybackground="white")
+        out_btn = Button(out_row, text="选择输出路径", command=self.select_output, width=12)
+        out_btn.pack(side="right")
 
         # 设置区域
-        settings_group = QGroupBox("设置")
-        settings_layout = QHBoxLayout(settings_group)
+        settings_frame = ttk.LabelFrame(main_frame, text="设置", padding=10)
+        settings_frame.pack(fill="x", pady=5)
 
-        dpi_layout = QHBoxLayout()
-        dpi_layout.addWidget(QLabel("DPI:"))
-        self.dpi_spin = QSpinBox()
-        self.dpi_spin.setRange(150, 600)
-        self.dpi_spin.setValue(300)
-        self.dpi_spin.setSingleStep(50)
-        dpi_layout.addWidget(self.dpi_spin)
-        settings_layout.addLayout(dpi_layout)
+        settings_row = Frame(settings_frame)
+        settings_row.pack(fill="x")
 
-        self.open_after_check = QCheckBox("完成后打开文件")
-        self.open_after_check.setChecked(True)
-        settings_layout.addWidget(self.open_after_check)
+        # DPI
+        dpi_frame = Frame(settings_row)
+        dpi_frame.pack(side="left")
+        Label(dpi_frame, text="DPI:").pack(side="left")
+        self.dpi_var = IntVar(value=300)
+        dpi_spin = ttk.Spinbox(dpi_frame, from_=150, to=600, increment=50, textvariable=self.dpi_var, width=8)
+        dpi_spin.pack(side="left", padx=5)
 
-        settings_layout.addStretch()
-        layout.addWidget(settings_group)
+        # 完成后打开
+        self.open_after_var = IntVar(value=1)
+        Checkbutton(settings_row, text="完成后打开文件", variable=self.open_after_var).pack(side="left", padx=20)
 
         # 进度区域
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setTextVisible(True)
-        self.progress_bar.setMinimumHeight(25)
-        layout.addWidget(self.progress_bar)
+        self.progress_var = IntVar(value=0)
+        self.progress_bar = ttk.Progressbar(main_frame, variable=self.progress_var, maximum=100)
+        self.progress_bar.pack(fill="x", pady=(10, 5))
 
-        self.status_label = QLabel("就绪")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.status_label)
+        self.status_var = StringVar(value="就绪")
+        status_label = Label(main_frame, textvariable=self.status_var, fg="gray")
+        status_label.pack()
 
         # 按钮区域
-        btn_layout = QHBoxLayout()
-        self.convert_btn = QPushButton("开始转换")
-        self.convert_btn.setMinimumHeight(45)
-        self.convert_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #28a745;
-                color: white;
-                font-size: 14px;
-                font-weight: bold;
-                border-radius: 6px;
-            }
-            QPushButton:hover { background-color: #218838; }
-            QPushButton:pressed { background-color: #1e7e34; }
-            QPushButton:disabled { background-color: #6c757d; }
-        """)
-        self.convert_btn.clicked.connect(self.start_convert)
+        btn_frame = Frame(main_frame)
+        btn_frame.pack(fill="x", pady=10)
 
-        self.cancel_btn = QPushButton("取消")
-        self.cancel_btn.setMinimumHeight(45)
-        self.cancel_btn.setEnabled(False)
-        self.cancel_btn.clicked.connect(self.cancel_convert)
+        self.convert_btn = Button(btn_frame, text="开始转换", command=self.start_convert, bg="#28a745", fg="white", font=("Microsoft YaHei", 11, "bold"), height=2)
+        self.convert_btn.pack(side="left", fill="x", expand=True, padx=(0, 5))
 
-        btn_layout.addWidget(self.convert_btn)
-        btn_layout.addWidget(self.cancel_btn)
-        layout.addLayout(btn_layout)
+        self.cancel_btn = Button(btn_frame, text="取消", command=self.cancel_convert, state="disabled", height=2)
+        self.cancel_btn.pack(side="right", fill="x", expand=True, padx=(5, 0))
 
         # 日志区域
-        log_group = QGroupBox("日志")
-        log_layout = QVBoxLayout(log_group)
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        self.log_text.setMaximumHeight(150)
-        log_layout.addWidget(self.log_text)
-        layout.addWidget(log_group)
+        log_frame = ttk.LabelFrame(main_frame, text="日志", padding=5)
+        log_frame.pack(fill="both", expand=True, pady=5)
 
-        # 启用拖拽
-        self.setAcceptDrops(True)
-        self.pdf_path_edit.setAcceptDrops(True)
+        log_scroll = Scrollbar(log_frame)
+        log_scroll.pack(side="right", fill="y")
 
-    def apply_styles(self):
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #f8f9fa;
-            }
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #dee2e6;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px;
-            }
-            QLineEdit {
-                border: 1px solid #ced4da;
-                border-radius: 6px;
-                padding: 5px 10px;
-                background: white;
-            }
-            QPushButton {
-                border: 1px solid #ced4da;
-                border-radius: 6px;
-                padding: 5px 15px;
-                background: #e9ecef;
-            }
-            QPushButton:hover {
-                background: #dee2e6;
-            }
-            QTextEdit {
-                border: 1px solid #ced4da;
-                border-radius: 6px;
-                background: #f8f9fa;
-                font-family: monospace;
-            }
-            QProgressBar {
-                border: 1px solid #ced4da;
-                border-radius: 6px;
-                text-align: center;
-            }
-            QProgressBar::chunk {
-                background-color: #28a745;
-                border-radius: 6px;
-            }
-        """)
+        self.log_text = Text(log_frame, height=6, yscrollcommand=log_scroll.set, state="disabled", font=("Consolas", 9))
+        self.log_text.pack(side="left", fill="both", expand=True)
+        log_scroll.config(command=self.log_text.yview)
 
-    def dragEnterEvent(self, event: QDragEnterEvent):
-        if event.mimeData().hasUrls():
-            urls = event.mimeData().urls()
-            if urls and urls[0].toLocalFile().lower().endswith('.pdf'):
-                event.acceptProposedAction()
+        # 拖拽支持
+        self.root.drop_target_register("*")
+        self.root.dnd_bind("<<Drop>>", self.on_drop)
+        pdf_entry.drop_target_register("*")
+        pdf_entry.dnd_bind("<<Drop>>", self.on_drop)
 
-    def dropEvent(self, event: QDropEvent):
-        urls = event.mimeData().urls()
-        if urls:
-            file_path = urls[0].toLocalFile()
-            if file_path.lower().endswith('.pdf'):
-                self.pdf_path_edit.setText(file_path)
-                # 自动设置输出路径
-                if not self.output_path_edit.text():
-                    default_out = str(Path(file_path).with_suffix('.md'))
-                    self.output_path_edit.setText(default_out)
+    def on_drop(self, event):
+        file_path = event.data.strip("{}")
+        if file_path.lower().endswith('.pdf'):
+            self.pdf_path_var.set(file_path)
+            if not self.output_path_var.get():
+                default_out = str(Path(file_path).with_suffix('.md'))
+                self.output_path_var.set(default_out)
 
     def select_pdf(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "选择 PDF 文件", "", "PDF 文件 (*.pdf)"
-        )
+        file_path = filedialog.askopenfilename(title="选择 PDF 文件", filetypes=[("PDF 文件", "*.pdf")])
         if file_path:
-            self.pdf_path_edit.setText(file_path)
-            if not self.output_path_edit.text():
+            self.pdf_path_var.set(file_path)
+            if not self.output_path_var.get():
                 default_out = str(Path(file_path).with_suffix('.md'))
-                self.output_path_edit.setText(default_out)
+                self.output_path_var.set(default_out)
 
     def select_output(self):
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "保存 Markdown 文件", "", "Markdown 文件 (*.md)"
-        )
+        file_path = filedialog.asksaveasfilename(title="保存 Markdown 文件", defaultextension=".md", filetypes=[("Markdown 文件", "*.md")])
         if file_path:
-            if not file_path.endswith('.md'):
-                file_path += '.md'
-            self.output_path_edit.setText(file_path)
+            self.output_path_var.set(file_path)
 
     def log(self, message):
-        self.log_text.append(message)
+        self.log_text.configure(state="normal")
+        self.log_text.insert("end", message + "\n")
+        self.log_text.see("end")
+        self.log_text.configure(state="disabled")
 
     def start_convert(self):
-        pdf_path = self.pdf_path_edit.text().strip()
+        pdf_path = self.pdf_path_var.get().strip()
         if not pdf_path:
-            QMessageBox.warning(self, "提示", "请先选择 PDF 文件")
+            messagebox.showwarning("提示", "请先选择 PDF 文件")
             return
         if not os.path.exists(pdf_path):
-            QMessageBox.warning(self, "错误", "PDF 文件不存在")
+            messagebox.showwarning("错误", "PDF 文件不存在")
             return
 
-        output_path = self.output_path_edit.text().strip()
+        output_path = self.output_path_var.get().strip()
         if not output_path:
             output_path = str(Path(pdf_path).with_suffix('.md'))
-            self.output_path_edit.setText(output_path)
+            self.output_path_var.set(output_path)
 
-        self.convert_btn.setEnabled(False)
-        self.cancel_btn.setEnabled(True)
-        self.progress_bar.setValue(0)
-        self.log_text.clear()
+        self.convert_btn.configure(state="disabled")
+        self.cancel_btn.configure(state="normal")
+        self.progress_var.set(0)
+        self.log_text.configure(state="normal")
+        self.log_text.delete(1.0, "end")
+        self.log_text.configure(state="disabled")
         self.log(f"开始转换: {pdf_path}")
 
-        self.convert_thread = ConvertThread(pdf_path, output_path, self.dpi_spin.value())
-        self.convert_thread.progress.connect(self.on_progress)
-        self.convert_thread.finished.connect(self.on_finished)
-        self.convert_thread.error.connect(self.on_error)
+        self.convert_thread = ConvertThread(
+            pdf_path, output_path, self.dpi_var.get(),
+            progress_cb=self.on_progress,
+            finished_cb=self.on_finished,
+            error_cb=self.on_error
+        )
         self.convert_thread.start()
 
     def on_progress(self, page, total, msg):
         percent = int(page / total * 100) if total > 0 else 0
-        self.progress_bar.setValue(percent)
-        self.status_label.setText(msg)
+        self.progress_var.set(percent)
+        self.status_var.set(msg)
         self.log(msg)
 
     def on_finished(self, result_path):
-        self.convert_btn.setEnabled(True)
-        self.cancel_btn.setEnabled(False)
-        self.progress_bar.setValue(100)
-        self.status_label.setText("转换完成")
+        self.convert_btn.configure(state="normal")
+        self.cancel_btn.configure(state="disabled")
+        self.progress_var.set(100)
+        self.status_var.set("转换完成")
         self.log(f"转换完成: {result_path}")
 
-        if self.open_after_check.isChecked():
+        if self.open_after_var.get():
             self.open_file(result_path)
 
-        QMessageBox.information(self, "完成", f"转换成功！\n输出文件: {result_path}")
+        messagebox.showinfo("完成", f"转换成功！\n输出文件: {result_path}")
 
     def on_error(self, error_msg):
-        self.convert_btn.setEnabled(True)
-        self.cancel_btn.setEnabled(False)
-        self.status_label.setText("转换失败")
+        self.convert_btn.configure(state="normal")
+        self.cancel_btn.configure(state="disabled")
+        self.status_var.set("转换失败")
         self.log(f"错误: {error_msg}")
-        QMessageBox.critical(self, "错误", f"转换失败:\n{error_msg}")
+        messagebox.showerror("错误", f"转换失败:\n{error_msg}")
 
     def cancel_convert(self):
-        if self.convert_thread and self.convert_thread.isRunning():
+        if self.convert_thread and self.convert_thread.is_alive():
             self.convert_thread.stop()
             self.log("用户取消转换")
-        self.convert_btn.setEnabled(True)
-        self.cancel_btn.setEnabled(False)
-        self.status_label.setText("已取消")
+        self.convert_btn.configure(state="normal")
+        self.cancel_btn.configure(state="disabled")
+        self.status_var.set("已取消")
 
     def open_file(self, file_path):
         if sys.platform == 'darwin':
@@ -327,25 +239,11 @@ class MainWindow(QMainWindow):
         else:
             os.system(f'xdg-open "{file_path}"')
 
-    def closeEvent(self, event):
-        if self.convert_thread and self.convert_thread.isRunning():
-            self.convert_thread.stop()
-        event.accept()
-
 
 def main():
-    app = QApplication(sys.argv)
-    app.setStyle('Fusion')
-
-    # 设置应用级字体
-    font = QFont("Microsoft YaHei", 10)
-    if sys.platform == 'darwin':
-        font = QFont("PingFang SC", 10)
-    app.setFont(font)
-
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())
+    root = Tk()
+    app = MainWindow(root)
+    root.mainloop()
 
 
 if __name__ == "__main__":

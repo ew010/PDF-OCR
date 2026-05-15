@@ -28,11 +28,24 @@ jobs:
             --name "PDF2Markdown" \
             --windowed \
             --onedir \
+            --osx-bundle-identifier "com.ew010.pdf2markdown" \
+            --collect-all PyQt6 \
+            --collect-all rapidocr \
+            --collect-all onnxruntime \
             --hidden-import=rapidocr \
             --hidden-import=onnxruntime \
             --hidden-import=fitz \
             --hidden-import=PIL \
             main_gui.py
+
+      - name: Fix Qt Framework Paths (macOS)
+        run: |
+          APP_PATH="dist/PDF2Markdown.app"
+          # Ensure Qt plugins are properly signed and located
+          if [ -d "$APP_PATH/Contents/MacOS/PyQt6/Qt6/plugins" ]; then
+            mkdir -p "$APP_PATH/Contents/PlugIns"
+            cp -R "$APP_PATH/Contents/MacOS/PyQt6/Qt6/plugins/"* "$APP_PATH/Contents/PlugIns/" || true
+          fi
 
       - name: Package macOS
         run: |
@@ -66,6 +79,8 @@ jobs:
             --name "PDF2Markdown" `
             --windowed `
             --onefile `
+            --collect-all rapidocr `
+            --collect-all onnxruntime `
             --hidden-import=rapidocr `
             --hidden-import=onnxruntime `
             --hidden-import=fitz `

@@ -41,12 +41,22 @@ def build():
 
     # 平台特定配置
     if platform == 'macos':
-        cmd.append('--onedir')
+        cmd.extend([
+            '--onedir',
+            '--osx-bundle-identifier', 'com.ew010.pdf2markdown',
+            '--collect-all', 'PyQt6',
+            '--collect-all', 'rapidocr',
+            '--collect-all', 'onnxruntime',
+        ])
         icon_path = 'assets/icon.icns'
         if os.path.exists(icon_path):
             cmd.extend(['--icon', icon_path])
     elif platform == 'windows':
-        cmd.append('--onefile')
+        cmd.extend([
+            '--onefile',
+            '--collect-all', 'rapidocr',
+            '--collect-all', 'onnxruntime',
+        ])
         icon_path = 'assets/icon.ico'
         if os.path.exists(icon_path):
             cmd.extend(['--icon', icon_path])
@@ -59,6 +69,23 @@ def build():
     if result.returncode != 0:
         print("打包失败!")
         sys.exit(1)
+
+    # macOS: 修复 Qt 插件路径
+    if platform == 'macos':
+        app_path = Path('dist/PDF2Markdown.app')
+        plugins_src = app_path / 'Contents/MacOS/PyQt6/Qt6/plugins'
+        plugins_dst = app_path / 'Contents/PlugIns'
+        if plugins_src.exists():
+            plugins_dst.mkdir(parents=True, exist_ok=True)
+            for item in plugins_src.iterdir():
+                dst = plugins_dst / item.name
+                if dst.exists():
+                    shutil.rmtree(dst) if dst.is_dir() else dst.unlink()
+                if item.is_dir():
+                    shutil.copytree(item, dst)
+                else:
+                    shutil.copy2(item, dst)
+            print("已修复 Qt 插件路径")
 
     print("打包成功!")
     dist_path = Path('dist')

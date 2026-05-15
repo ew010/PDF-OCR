@@ -33,7 +33,6 @@ def build():
         sys.executable, '-m', 'PyInstaller',
         '--name', 'PDF2Markdown',
         '--windowed',
-        '--onefile',
         '--hidden-import=rapidocr',
         '--hidden-import=onnxruntime',
         '--hidden-import=fitz',
@@ -42,15 +41,15 @@ def build():
 
     # 平台特定配置
     if platform == 'macos':
+        cmd.append('--onedir')
         icon_path = 'assets/icon.icns'
         if os.path.exists(icon_path):
             cmd.extend(['--icon', icon_path])
-        cmd.extend(['--add-data', 'assets:assets'])
     elif platform == 'windows':
+        cmd.append('--onefile')
         icon_path = 'assets/icon.ico'
         if os.path.exists(icon_path):
             cmd.extend(['--icon', icon_path])
-        cmd.extend(['--add-data', 'assets;assets'])
 
     cmd.append('main_gui.py')
 

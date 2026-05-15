@@ -27,9 +27,7 @@ jobs:
           pyinstaller \
             --name "PDF2Markdown" \
             --windowed \
-            --onefile \
-            --icon=assets/icon.icns \
-            --add-data "assets:assets" \
+            --onedir \
             --hidden-import=rapidocr \
             --hidden-import=onnxruntime \
             --hidden-import=fitz \
@@ -39,7 +37,7 @@ jobs:
       - name: Package macOS
         run: |
           cd dist
-          zip -r "PDF2Markdown-macOS.zip" "PDF2Markdown.app" || zip -r "PDF2Markdown-macOS.zip" "PDF2Markdown"
+          zip -r "PDF2Markdown-macOS.zip" "PDF2Markdown.app"
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v4
@@ -68,8 +66,6 @@ jobs:
             --name "PDF2Markdown" `
             --windowed `
             --onefile `
-            --icon=assets/icon.ico `
-            --add-data "assets;assets" `
             --hidden-import=rapidocr `
             --hidden-import=onnxruntime `
             --hidden-import=fitz `

@@ -39,6 +39,7 @@ def build():
         '--hidden-import=PIL',
         '--collect-submodules', 'rapidocr',
         '--collect-submodules', 'rapidocr.utils',
+        '--collect-data', 'rapidocr',
         '--collect-binaries', 'onnxruntime',
         '--copy-metadata', 'rapidocr',
         '--copy-metadata', 'onnxruntime',

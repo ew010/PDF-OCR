@@ -31,6 +31,7 @@ jobs:
             --osx-bundle-identifier "com.ew010.pdf2markdown" \
             --collect-submodules rapidocr \
             --collect-submodules rapidocr.utils \
+            --collect-data rapidocr \
             --collect-binaries onnxruntime \
             --copy-metadata rapidocr \
             --copy-metadata onnxruntime \
@@ -78,6 +79,7 @@ jobs:
             --onefile `
             --collect-submodules rapidocr `
             --collect-submodules rapidocr.utils `
+            --collect-data rapidocr `
             --collect-binaries onnxruntime `
             --copy-metadata rapidocr `
             --copy-metadata onnxruntime `
